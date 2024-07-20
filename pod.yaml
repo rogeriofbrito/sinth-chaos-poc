@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Pod
+metadata:
+#  generateName: pod-network-loss-
+  name: pod-network-loss
+  namespace: litmus
+spec:
+  volumes:
+    - name: cri-socket
+      hostPath:
+        path: /run/containerd/containerd.sock
+  containers:
+    - name: pod-network-loss
+      image: localhost:5000/sinth-chaos-poc:latest
+      imagePullPolicy: IfNotPresent
+      command:
+        - /sinth/sinth
+#        - sleep
+#        - infinity
+      env:
+        - name: PIDS
+          value: '273096,273090'
+        - name: NETWORK_INTERFACE
+          value: eth0
+        - name: NETEM_COMMANDS
+          value: loss 100
+      volumeMounts:
+        - name: cri-socket
+          mountPath: /run/containerd/containerd.sock
+      securityContext:
+        capabilities:
+          add:
+            - NET_ADMIN
+            - SYS_ADMIN
+        privileged: true
+  hostPID: true
