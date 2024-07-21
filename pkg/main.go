@@ -34,6 +34,7 @@ func main() {
 	netInterface := os.Getenv("NETWORK_INTERFACE")
 	netemCommands := os.Getenv("NETEM_COMMANDS")
 	socketPath := os.Getenv("SOCKET_PATH")
+	destinationIPs := os.Getenv("DESTINATION_IPS")
 
 	k8sClient, err := getK8sClient()
 	if err != nil {
@@ -57,15 +58,33 @@ func main() {
 	fmt.Printf("injecting pids %v...\n", pids)
 
 	for _, pid := range pids {
-		inject := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root netem %v", pid, netInterface, netemCommands)
-		injectCmd := exec.Command("/bin/bash", "-c", inject)
+		var injectCmds []*exec.Cmd
+		destinationIPsSlice := strings.Split(destinationIPs, ",")
+
+		if len(destinationIPsSlice) == 0 {
+			inject := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root netem %v", pid, netInterface, netemCommands)
+			injectCmds = append(injectCmds, exec.Command("/bin/bash", "-c", inject))
+		} else {
+			inject := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev eth0 root handle 1: prio", pid)
+			injectCmds = append(injectCmds, exec.Command("/bin/bash", "-c", inject))
+
+			inject = fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev eth0 parent 1:3 netem loss 100", pid)
+			injectCmds = append(injectCmds, exec.Command("/bin/bash", "-c", inject))
+
+			for _, destinationIP := range destinationIPsSlice {
+				inject = fmt.Sprintf("sudo nsenter -t %d -n tc filter add dev eth0 protocol ip parent 1:0 prio 3 u32 match ip dst %s flowid 1:3", pid, destinationIP)
+				injectCmds = append(injectCmds, exec.Command("/bin/bash", "-c", inject))
+			}
+		}
 
 		fmt.Printf("injecting on pid %d\n", pid)
 
-		_, _, err := runCmd(injectCmd)
-		if err != nil {
-			fmt.Println("error on inject cmd")
-			return
+		for _, injectCmd := range injectCmds {
+			_, _, err := runCmd(injectCmd)
+			if err != nil {
+				fmt.Println("error on inject cmd")
+				return
+			}
 		}
 	}
 
