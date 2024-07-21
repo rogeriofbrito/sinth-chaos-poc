@@ -30,7 +30,7 @@ spec:
         - name: SOCKET_PATH
           value: /run/containerd/containerd.sock
         - name: DESTINATION_IPS
-          value: 142.250.219.142,20.76.201.171,20.236.44.162,20.112.250.133,20.231.239.246,20.70.246.20
+          value: 142.250.219.142,20.76.201.171,20.236.44.162,20.112.250.133,20.231.239.246,20.70.246.20,10.96.84.111
       volumeMounts:
         - name: cri-socket
           mountPath: /run/containerd/containerd.sock

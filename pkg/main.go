@@ -13,14 +13,6 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type InfoDetails struct {
-	PID int `json:"pid"`
-}
-
-type CrictlInspectResponse struct {
-	Info InfoDetails `json:"info"`
-}
-
 func main() {
 	ctx := context.Background()
 
@@ -33,32 +25,27 @@ func main() {
 	socketPath := os.Getenv("SOCKET_PATH")
 	destinationIPs := os.Getenv("DESTINATION_IPS")
 
-	// K8sClient
-	clientset, err := getClientset()
-	if err != nil {
-		fmt.Println("error on getClientset")
-		panic(err)
-	}
-	k8sClient := client.NewK8sClient(clientset)
+	// KubernetesClient
+	var kubernetesClient client.KubernetesClient = client.NewK8sClient(getClientset())
 
-	// OsBashExec
-	osBashExec := cmd.NewOsBashExec()
+	// Command
+	var command cmd.Command = cmd.NewOsBashExec()
 
-	// Containerd client
-	containerdClient := client.NewContainerdClient(osBashExec, socketPath)
+	// ContainerRuntimeClient
+	var containerRuntimeClient client.ContainerRuntimeClient = client.NewContainerdClient(command, socketPath)
 
 	// Get Pods
-	pods, err := k8sClient.GetPodsByNamespaceAndLabelSelector(ctx, namespace, labelSelector)
+	pods, err := kubernetesClient.GetPodsByNamespaceAndLabelSelector(ctx, namespace, labelSelector)
 	if err != nil {
 		fmt.Println("error on GetPodsByNamespaceAndLabelSelector")
 		panic(err)
 	}
 
 	// Get first container of each pod
-	containerIds := getPodsContainerIds(pods)
+	containerIds := getContainerIds(pods)
 
 	// Get pid of each container
-	pids, err := getCrioPIDs(ctx, containerdClient, containerIds)
+	pids, err := getPIDs(ctx, containerRuntimeClient, containerIds)
 	if err != nil {
 		fmt.Printf("error on getCrioPIDs: %s\n", err.Error())
 		panic(err)
@@ -89,7 +76,7 @@ func main() {
 		fmt.Printf("injecting on pid %d\n", pid)
 
 		for _, inject := range injects {
-			_, _, err := osBashExec.Exec(inject)
+			_, _, err := command.Exec(inject)
 			if err != nil {
 				fmt.Println("error on inject cmd")
 				return
@@ -106,7 +93,7 @@ func main() {
 
 		fmt.Printf("killing on pid %d\n", pid)
 
-		_, _, err := osBashExec.Exec(kill)
+		_, _, err := command.Exec(kill)
 		if err != nil {
 			fmt.Println("error on kill cmd")
 			return
@@ -118,16 +105,23 @@ func main() {
 	time.Sleep(600 * time.Second)
 }
 
-func getClientset() (*kubernetes.Clientset, error) {
+func getClientset() *kubernetes.Clientset {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		panic(err.Error())
 	}
 
-	return kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(config)
+
+	if err != nil {
+		fmt.Println("error on getClientset")
+		panic(err)
+	}
+
+	return clientset
 }
 
-func getPodsContainerIds(pods []client.Pod) []string {
+func getContainerIds(pods []client.Pod) []string {
 	var containerIds []string
 	for _, pod := range pods {
 		firstContainer := pod.Containers[0]
@@ -137,10 +131,10 @@ func getPodsContainerIds(pods []client.Pod) []string {
 	return containerIds
 }
 
-func getCrioPIDs(ctx context.Context, containerdClient client.ContainerdClient, containerIDs []string) ([]int, error) {
+func getPIDs(ctx context.Context, containerRuntimeClient client.ContainerRuntimeClient, containerIDs []string) ([]int, error) {
 	var pids []int
 	for _, containerID := range containerIDs {
-		container, err := containerdClient.GetContainerByID(ctx, containerID)
+		container, err := containerRuntimeClient.GetContainerByID(ctx, containerID)
 		if err != nil {
 			return nil, err
 		}
