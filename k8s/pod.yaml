@@ -5,6 +5,7 @@ metadata:
   name: pod-network-loss
   namespace: litmus
 spec:
+  serviceAccountName: litmus-admin
   volumes:
     - name: cri-socket
       hostPath:
@@ -18,12 +19,16 @@ spec:
 #        - sleep
 #        - infinity
       env:
-        - name: PIDS
-          value: '273096,273090'
+        - name: NAMESPACE
+          value: order-api-app
+        - name: LABEL_SELECTOR
+          value: app=order-api-app
         - name: NETWORK_INTERFACE
           value: eth0
         - name: NETEM_COMMANDS
           value: loss 100
+        - name: SOCKET_PATH
+          value: /run/containerd/containerd.sock
       volumeMounts:
         - name: cri-socket
           mountPath: /run/containerd/containerd.sock
