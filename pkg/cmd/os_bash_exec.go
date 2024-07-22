@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"os/exec"
 
 	"github.com/rogeriofbrito/sinth-chaos-poc/pkg/log"
@@ -24,8 +25,7 @@ func (osBashExec OsBashExec) Exec(command string) (string, string, error) {
 
 	if err := cmd.Run(); err != nil {
 		stderr := stderrBuffer.String()
-		log.Errorf("Error on executing command: %s, stderr: %s", err, stderr)
-		return "", "", err
+		return "", "", fmt.Errorf("OsBashExec.Exec - error on executing command: %w, stderr: %s", err, stderr)
 	}
 
 	stdout := stdoutBuffer.String()

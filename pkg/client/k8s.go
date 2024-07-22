@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/rogeriofbrito/sinth-chaos-poc/pkg/log"
@@ -28,8 +29,7 @@ func (k8sClient K8sClient) GetPodsByNamespaceAndLabelSelector(ctx context.Contex
 
 	podList, err := k8sClient.clientset.CoreV1().Pods(namespace).List(ctx, listOptions)
 	if err != nil {
-		log.Errorf("Error on listing pods: %s", err)
-		return nil, err
+		return nil, fmt.Errorf("K8sClient.GetPodsByNamespaceAndLabelSelector - error on listing pods: %w", err)
 	}
 
 	log.Infof("%d pods were found", len(podList.Items))

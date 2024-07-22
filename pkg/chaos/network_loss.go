@@ -59,7 +59,7 @@ Loop:
 		default:
 			pods, err := networkLoss.KubernetesClient.GetPodsByNamespaceAndLabelSelector(ctx, params.Namespace, params.LabelSelector)
 			if err != nil {
-				log.Errorf("Error on get pods by namespace and label selector")
+				log.Errorf("NewNetworkLoss.Execute - error on get pods by namespace and label selector: %s", err)
 				cancelFunc()
 			}
 
@@ -92,7 +92,7 @@ func (networkLoss NetworkLoss) do(ctx context.Context, wg *sync.WaitGroup, pod c
 
 	container, err := networkLoss.ContainerRuntimeClient.GetContainerByID(ctx, containerID)
 	if err != nil {
-		log.Errorf("Error on get container by ID: %s", err)
+		log.Errorf("NetworkLoss.do - error on get container by ID: %s", err)
 		return
 	}
 
@@ -101,7 +101,7 @@ func (networkLoss NetworkLoss) do(ctx context.Context, wg *sync.WaitGroup, pod c
 
 	err = networkLoss.inject(pid, params)
 	if err != nil {
-		log.Errorf("Error on inject chaos on PID %d, error: %s", pid, err)
+		log.Errorf("NetworkLoss.do - error on inject chaos on PID %d, error: %s", pid, err)
 		return
 	}
 
@@ -111,7 +111,7 @@ func (networkLoss NetworkLoss) do(ctx context.Context, wg *sync.WaitGroup, pod c
 
 	err = networkLoss.kill(pid, params)
 	if err != nil {
-		log.Errorf("Error on kill chaos on PID %d, error: %s", pid, err)
+		log.Errorf("NetworkLoss.do - error on kill chaos on PID %d, error: %s", pid, err)
 		return
 	}
 }
@@ -140,7 +140,7 @@ func (networkLoss NetworkLoss) inject(pid int, params NetworkLossParams) error {
 	for _, inject := range injects {
 		_, _, err := networkLoss.Command.Exec(inject)
 		if err != nil {
-			log.Errorf("Error on exec inject command: %s", err)
+			log.Errorf("NetworkLoss.inject - error on exec inject command: %s", err)
 			return err
 		}
 	}
@@ -153,7 +153,7 @@ func (networkLoss NetworkLoss) kill(pid int, params NetworkLossParams) error {
 
 	_, _, err := networkLoss.Command.Exec(kill)
 	if err != nil {
-		log.Errorf("Error on exec inject command: %s", err)
+		log.Errorf("NetworkLoss.kill - error on exec inject command: %s", err)
 		return err
 	}
 

@@ -30,7 +30,7 @@ func NewContainerdClient(command cmd.Command, socketPath string) ContainerdClien
 	}
 }
 
-func (containerdClient ContainerdClient) GetContainerByID(ctx context.Context, containerID string) (Container, error) {
+func (containerdClient ContainerdClient) GetContainerByID(ctx context.Context, containerID string) (Container, error) { // TODO: change to pointer
 	log.Infof("Getting container by ID (%s)", containerID)
 
 	cmd := fmt.Sprintf("sudo crictl -i unix://%s -r unix://%s inspect %s", containerdClient.socketPath, containerdClient.socketPath, containerID)
@@ -39,15 +39,13 @@ func (containerdClient ContainerdClient) GetContainerByID(ctx context.Context, c
 
 	stdout, stderr, err := containerdClient.command.Exec(cmd)
 	if err != nil {
-		log.Errorf("Error on executing crictl inspect command: %s, stderr: %s", err, stderr)
-		return Container{}, err
+		return Container{}, fmt.Errorf("ContainerdClient.GetContainerByID - error on executing crictl inspect command: %w, stderr: %s", err, stderr)
 	}
 	log.Infof("Output crictl inspect: %s", stdout)
 
 	var resp CrictlInspectResponse
 	if err := json.Unmarshal([]byte(stdout), &resp); err != nil {
-		log.Infof("Error on unmarshal crictl inspect response: %s", err)
-		return Container{}, err
+		return Container{}, fmt.Errorf("ContainerdClient.GetContainerByID - error on unmarshal crictl inspect response: %w", err)
 	}
 
 	container := Container{

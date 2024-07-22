@@ -56,13 +56,13 @@ func getClientset() *kubernetes.Clientset {
 	log.Info("Getting InCluster config for clientset")
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		log.Fatalf("Error on getting InCluster config for clientset: %s", err)
+		log.Fatalf("getClientset - error on getting InCluster config for clientset: %s", err)
 	}
 
 	log.Info("Creating new clientset")
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		log.Fatalf("Error on creating new clientset: %s", err)
+		log.Fatalf("getClientset - error on creating new clientset: %s", err)
 	}
 
 	return clientset
