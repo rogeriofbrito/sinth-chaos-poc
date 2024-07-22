@@ -65,9 +65,8 @@ Loop:
 
 			for _, pod := range pods {
 				if !injectedPods[pod.Name] {
-					log.Infof("Injecting chaos in %s", pod.Name)
 					wg.Add(1)
-					go n.do(ctx, &wg, pod, params)
+					go n.do(ctx, cancelFunc, &wg, pod, params)
 					injectedPods[pod.Name] = true
 				} else {
 					log.Infof("Fault already injected in pod %s", pod.Name)
@@ -81,7 +80,7 @@ Loop:
 	wg.Wait()
 }
 
-func (n NetworkLoss) do(ctx context.Context, wg *sync.WaitGroup, pod client.Pod, params NetworkLossParams) {
+func (n NetworkLoss) do(ctx context.Context, cancelFunc context.CancelFunc, wg *sync.WaitGroup, pod client.Pod, params NetworkLossParams) {
 	defer wg.Done()
 
 	log.Infof("Injecting network-loss chaos in pod %s", pod.Name)
@@ -93,6 +92,7 @@ func (n NetworkLoss) do(ctx context.Context, wg *sync.WaitGroup, pod client.Pod,
 	container, err := n.ContainerRuntime.GetContainerByID(ctx, containerID)
 	if err != nil {
 		log.Errorf("NetworkLoss.do - error on get container by ID: %s", err)
+		cancelFunc()
 		return
 	}
 
@@ -102,6 +102,7 @@ func (n NetworkLoss) do(ctx context.Context, wg *sync.WaitGroup, pod client.Pod,
 	err = n.inject(pid, params)
 	if err != nil {
 		log.Errorf("NetworkLoss.do - error on inject chaos on PID %d, error: %s", pid, err)
+		cancelFunc()
 		return
 	}
 
@@ -112,6 +113,7 @@ func (n NetworkLoss) do(ctx context.Context, wg *sync.WaitGroup, pod client.Pod,
 	err = n.kill(pid, params)
 	if err != nil {
 		log.Errorf("NetworkLoss.do - error on kill chaos on PID %d, error: %s", pid, err)
+		cancelFunc()
 		return
 	}
 }
