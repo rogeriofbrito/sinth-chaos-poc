@@ -59,3 +59,11 @@ func Errorf(msg string, err ...interface{}) {
 func Error(msg string) {
 	logrus.WithFields(logrus.Fields{}).Error(msg)
 }
+
+func Debugf(msg string, err ...interface{}) {
+	logrus.WithFields(logrus.Fields{}).Debugf(msg, err...)
+}
+
+func Debug(msg string) {
+	logrus.WithFields(logrus.Fields{}).Debug(msg)
+}
