@@ -8,14 +8,14 @@ import (
 	"github.com/rogeriofbrito/sinth-chaos-poc/pkg/log"
 )
 
-type OsBashExec struct{}
+type OsBashExecCommand struct{}
 
-func NewOsBashExec() OsBashExec {
-	log.Info("Creating new command impl (OsBashExec)")
-	return OsBashExec{}
+func NewOsBashExecCommand() OsBashExecCommand {
+	log.Info("Creating new OsBashExecCommand cmd")
+	return OsBashExecCommand{}
 }
 
-func (osBashExec OsBashExec) Exec(command string) (string, string, error) { // TODO: change to pointer
+func (o OsBashExecCommand) Exec(command string) (string, string, error) { // TODO: change to pointer
 	log.Infof("Executing command with bash: %s", command)
 	cmd := exec.Command("/bin/bash", "-c", command)
 
@@ -25,7 +25,7 @@ func (osBashExec OsBashExec) Exec(command string) (string, string, error) { // T
 
 	if err := cmd.Run(); err != nil {
 		stderr := stderrBuffer.String() // TODO: when command fails, there is stderr?
-		return "", "", fmt.Errorf("OsBashExec.Exec - error on executing command: %w, stderr: %s", err, stderr)
+		return "", "", fmt.Errorf("OsBashExecCommand.Exec - error on executing command: %w, stderr: %s", err, stderr)
 	}
 
 	stdout := stdoutBuffer.String()

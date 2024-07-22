@@ -10,26 +10,26 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-type K8sClient struct {
+type ClientsetKubernetes struct {
 	clientset *kubernetes.Clientset
 }
 
-func NewK8sClient(clientset *kubernetes.Clientset) *K8sClient {
-	log.Info("Creating new Kubernetes Client (K8sClient)")
-	return &K8sClient{
+func NewClientsetKubernetes(clientset *kubernetes.Clientset) *ClientsetKubernetes {
+	log.Info("Creating new ClientsetKubernetes Client")
+	return &ClientsetKubernetes{
 		clientset: clientset,
 	}
 }
 
-func (k8sClient K8sClient) GetPodsByNamespaceAndLabelSelector(ctx context.Context, namespace string, labelSelector string) ([]Pod, error) {
+func (c ClientsetKubernetes) GetPodsByNamespaceAndLabelSelector(ctx context.Context, namespace string, labelSelector string) ([]Pod, error) {
 	log.Infof("Getting pods by namespace (%s) and label selector (%s)", namespace, labelSelector)
 	listOptions := metav1.ListOptions{
 		LabelSelector: labelSelector,
 	}
 
-	podList, err := k8sClient.clientset.CoreV1().Pods(namespace).List(ctx, listOptions)
+	podList, err := c.clientset.CoreV1().Pods(namespace).List(ctx, listOptions)
 	if err != nil {
-		return nil, fmt.Errorf("K8sClient.GetPodsByNamespaceAndLabelSelector - error on listing pods: %w", err)
+		return nil, fmt.Errorf("ClientsetKubernetes.GetPodsByNamespaceAndLabelSelector - error on listing pods: %w", err)
 	}
 
 	log.Infof("%d pods were found", len(podList.Items))
@@ -38,10 +38,10 @@ func (k8sClient K8sClient) GetPodsByNamespaceAndLabelSelector(ctx context.Contex
 	for _, podItem := range podList.Items {
 		var podContainers []PodContainer
 		// TODO: filter only running pods
-		log.Info("Getting containers from pods")
+		log.Infof("Getting containers of pod %s", podItem.Name)
 		for _, containerStatuses := range podItem.Status.ContainerStatuses {
 			podContainer := PodContainer{
-				ID: k8sClient.getContainerIDFromContainerdUri(containerStatuses.ContainerID),
+				ID: c.getContainerIDFromContainerdUri(containerStatuses.ContainerID),
 			}
 			podContainers = append(podContainers, podContainer)
 		}
@@ -56,6 +56,6 @@ func (k8sClient K8sClient) GetPodsByNamespaceAndLabelSelector(ctx context.Contex
 	return pods, nil
 }
 
-func (k8sClient K8sClient) getContainerIDFromContainerdUri(containerdUri string) string {
+func (c ClientsetKubernetes) getContainerIDFromContainerdUri(containerdUri string) string {
 	return strings.Replace(containerdUri, "containerd://", "", 1) // remove containerd:// prefix
 }

@@ -4,6 +4,6 @@ import (
 	"context"
 )
 
-type KubernetesClient interface {
+type Kubernetes interface {
 	GetPodsByNamespaceAndLabelSelector(ctx context.Context, namespace string, labelSelector string) ([]Pod, error)
 }

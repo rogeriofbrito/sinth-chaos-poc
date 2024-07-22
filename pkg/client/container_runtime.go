@@ -2,6 +2,6 @@ package client
 
 import "context"
 
-type ContainerRuntimeClient interface {
+type ContainerRuntime interface {
 	GetContainerByID(ctx context.Context, containerID string) (Container, error)
 }

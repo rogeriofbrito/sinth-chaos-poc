@@ -26,14 +26,14 @@ func main() {
 	socketPath := os.Getenv("SOCKET_PATH")
 	destinationIPs := os.Getenv("DESTINATION_IPS")
 
-	// KubernetesClient
-	var kubernetesClient client.KubernetesClient = client.NewK8sClient(getClientset())
+	// Kubernetes client
+	var kubernetes client.Kubernetes = client.NewClientsetKubernetes(getClientset())
 
-	// Command
-	var command cmd.Command = cmd.NewOsBashExec()
+	// Command cmd
+	var command cmd.Command = cmd.NewOsBashExecCommand()
 
-	// ContainerRuntimeClient
-	var containerRuntimeClient client.ContainerRuntimeClient = client.NewContainerdClient(command, socketPath)
+	// ContainerRuntime client
+	var containerRuntime client.ContainerRuntime = client.NewContainerdContainerRuntime(command, socketPath)
 
 	// NetworkLossParams
 	log.Info("Creating network-loss params")
@@ -46,7 +46,7 @@ func main() {
 	}
 
 	// NetworkLoss
-	networkLoss := chaos.NewNetworkLoss(kubernetesClient, containerRuntimeClient, command)
+	networkLoss := chaos.NewNetworkLoss(kubernetes, containerRuntime, command)
 	networkLoss.Execute(ctx, params)
 
 	time.Sleep(600 * time.Second)
