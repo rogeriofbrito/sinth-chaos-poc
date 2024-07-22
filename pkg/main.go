@@ -2,21 +2,22 @@ package main
 
 import (
 	"context"
-	"fmt"
+
 	"os"
 	"time"
 
 	"github.com/rogeriofbrito/sinth-chaos-poc/pkg/chaos"
 	"github.com/rogeriofbrito/sinth-chaos-poc/pkg/client"
 	"github.com/rogeriofbrito/sinth-chaos-poc/pkg/cmd"
+	"github.com/rogeriofbrito/sinth-chaos-poc/pkg/log"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
 func main() {
-	ctx := context.Background()
+	log.Info("Starting Sinth Chaos")
 
-	fmt.Println("sinth-chaos-poc")
+	ctx := context.Background()
 
 	namespace := os.Getenv("NAMESPACE")
 	labelSelector := os.Getenv("LABEL_SELECTOR")
@@ -35,6 +36,7 @@ func main() {
 	var containerRuntimeClient client.ContainerRuntimeClient = client.NewContainerdClient(command, socketPath)
 
 	// NetworkLossParams
+	log.Info("Creating network-loss params")
 	params := chaos.NetworkLossParams{
 		Namespace:        namespace,
 		LabelSelector:    labelSelector,
@@ -51,16 +53,16 @@ func main() {
 }
 
 func getClientset() *kubernetes.Clientset {
+	log.Info("Getting InCluster config for clientset")
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		panic(err.Error())
+		log.Fatalf("Error on getting InCluster config for clientset: %s", err)
 	}
 
+	log.Info("Creating new clientset")
 	clientset, err := kubernetes.NewForConfig(config)
-
 	if err != nil {
-		fmt.Println("error on getClientset")
-		panic(err)
+		log.Fatalf("Error on creating new clientset: %s", err)
 	}
 
 	return clientset

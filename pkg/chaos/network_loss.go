@@ -2,6 +2,7 @@ package chaos
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/rogeriofbrito/sinth-chaos-poc/pkg/client"
 	"github.com/rogeriofbrito/sinth-chaos-poc/pkg/cmd"
+	"github.com/rogeriofbrito/sinth-chaos-poc/pkg/log"
 )
 
 type NetworkLossParams struct {
@@ -19,6 +21,11 @@ type NetworkLossParams struct {
 	NetemCommands    string
 }
 
+func (networkLossParams NetworkLossParams) String() string {
+	bytes, _ := json.Marshal(networkLossParams)
+	return string(bytes)
+}
+
 type NetworkLoss struct {
 	KubernetesClient       client.KubernetesClient
 	ContainerRuntimeClient client.ContainerRuntimeClient
@@ -26,6 +33,7 @@ type NetworkLoss struct {
 }
 
 func NewNetworkLoss(kubernetesClient client.KubernetesClient, containerRuntimeClient client.ContainerRuntimeClient, command cmd.Command) NetworkLoss {
+	log.Info("Creating new NetworkLoss chaos ")
 	return NetworkLoss{
 		KubernetesClient:       kubernetesClient,
 		ContainerRuntimeClient: containerRuntimeClient,
@@ -34,6 +42,7 @@ func NewNetworkLoss(kubernetesClient client.KubernetesClient, containerRuntimeCl
 }
 
 func (networkLoss NetworkLoss) Execute(ctx context.Context, params NetworkLossParams) {
+	log.Infof("Executing network-loss chaos with params: %s", params.String())
 	ctx, cancelFunc := context.WithTimeout(ctx, time.Duration(60*time.Second))
 	defer cancelFunc()
 
@@ -45,21 +54,23 @@ Loop:
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("end chaos")
+			log.Info("Context done, chaos end")
 			break Loop
 		default:
-			fmt.Println("searching pods")
-
 			pods, err := networkLoss.KubernetesClient.GetPodsByNamespaceAndLabelSelector(ctx, params.Namespace, params.LabelSelector)
 			if err != nil {
+				log.Errorf("Error on get pods by namespace and label selector")
 				cancelFunc()
 			}
 
 			for _, pod := range pods {
 				if !injectedPods[pod.Name] {
+					log.Infof("Injecting chaos in %s", pod.Name)
 					wg.Add(1)
 					go networkLoss.do(ctx, &wg, pod, params)
 					injectedPods[pod.Name] = true
+				} else {
+					log.Infof("%s already injected", pod.Name)
 				}
 			}
 
@@ -73,28 +84,34 @@ Loop:
 func (networkLoss NetworkLoss) do(ctx context.Context, wg *sync.WaitGroup, pod client.Pod, params NetworkLossParams) {
 	defer wg.Done()
 
-	// inject
+	log.Infof("Injecting network-loss chaos in pod %s", pod.Name)
 
 	containerID := pod.Containers[0].ID
 
+	log.Infof("Container id %s", containerID)
+
 	container, err := networkLoss.ContainerRuntimeClient.GetContainerByID(ctx, containerID)
 	if err != nil {
+		log.Errorf("Error on get container by ID: %s", err)
 		return
 	}
 
 	pid := container.PID
+	log.Infof("Container PID: %d", pid)
 
 	err = networkLoss.inject(pid, params)
 	if err != nil {
+		log.Errorf("Error on inject chaos on PID %d, error: %s", pid, err)
 		return
 	}
 
 	<-ctx.Done()
 
-	// kill
+	log.Infof("Killling network-loss chaos in pod %s", pod.Name)
 
 	err = networkLoss.kill(pid, params)
 	if err != nil {
+		log.Errorf("Error on kill chaos on PID %d, error: %s", pid, err)
 		return
 	}
 }
@@ -102,6 +119,7 @@ func (networkLoss NetworkLoss) do(ctx context.Context, wg *sync.WaitGroup, pod c
 func (networkLoss NetworkLoss) inject(pid int, params NetworkLossParams) error {
 	var injects []string
 	destinationIPsSlice := strings.Split(params.DestinationIPs, ",")
+	log.Infof("Number of IPs: %d", len(destinationIPsSlice))
 
 	if len(destinationIPsSlice) == 0 {
 		inject := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root netem %s", pid, params.NetworkInterface, params.NetemCommands)
@@ -119,11 +137,10 @@ func (networkLoss NetworkLoss) inject(pid int, params NetworkLossParams) error {
 		}
 	}
 
-	fmt.Printf("injecting on pid %d\n", pid)
-
 	for _, inject := range injects {
 		_, _, err := networkLoss.Command.Exec(inject)
 		if err != nil {
+			log.Errorf("Error on exec inject command: %s", err)
 			return err
 		}
 	}
@@ -134,10 +151,9 @@ func (networkLoss NetworkLoss) inject(pid int, params NetworkLossParams) error {
 func (networkLoss NetworkLoss) kill(pid int, params NetworkLossParams) error {
 	kill := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc delete dev %s root", pid, params.NetworkInterface)
 
-	fmt.Printf("killing on pid %d\n", pid)
-
 	_, _, err := networkLoss.Command.Exec(kill)
 	if err != nil {
+		log.Errorf("Error on exec inject command: %s", err)
 		return err
 	}
 
