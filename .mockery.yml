@@ -1,0 +1,14 @@
+with-expecter: true
+packages:
+  github.com/rogeriofbrito/sinth-chaos-poc/pkg/client:
+    config:
+    interfaces:
+      ContainerRuntime:
+        config:
+      Kubernetes:
+        config:
+  github.com/rogeriofbrito/sinth-chaos-poc/pkg/cmd:
+    config:
+    interfaces:
+      Command:
+        config:
