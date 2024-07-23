@@ -49,6 +49,8 @@ func (n NetworkLoss) Execute(ctx context.Context, params NetworkLossParams) {
 
 	wg := sync.WaitGroup{}
 
+	var isProcessed = make(map[string]bool)
+
 Loop:
 	for {
 		select {
@@ -56,7 +58,8 @@ Loop:
 			log.Info("Chaos end")
 			break Loop
 		default:
-			n.searchPodsAndInjectAndRemoveFault(ctx, cancelFunc, &wg, params)
+			pods := n.searchPods(ctx, cancelFunc, params)
+			n.injectAndRemoveFaultEveryPod(ctx, cancelFunc, &wg, &isProcessed, pods, params)
 			time.Sleep(1 * time.Second)
 		}
 	}
@@ -64,17 +67,18 @@ Loop:
 	wg.Wait()
 }
 
-func (n NetworkLoss) searchPodsAndInjectAndRemoveFault(ctx context.Context, cancelFunc context.CancelFunc, wg *sync.WaitGroup, params NetworkLossParams) {
+func (n NetworkLoss) searchPods(ctx context.Context, cancelFunc context.CancelFunc, params NetworkLossParams) []client.Pod {
 	pods, err := n.Kubernetes.GetPodsByNamespaceAndLabelSelector(ctx, params.Namespace, params.LabelSelector)
 	if err != nil {
-		log.Errorf("NewNetworkLoss.searchPodsAndInjectAndRemoveFault - error on get pods by namespace and label selector: %s", err)
+		log.Errorf("NewNetworkLoss.searchPods - error on get pods by namespace and label selector: %s", err)
 		cancelFunc()
 	}
+	return pods
+}
 
-	var isProcessed = make(map[string]bool)
-
+func (n NetworkLoss) injectAndRemoveFaultEveryPod(ctx context.Context, cancelFunc context.CancelFunc, wg *sync.WaitGroup, isProcessed *map[string]bool, pods []client.Pod, params NetworkLossParams) {
 	for _, pod := range pods {
-		if isProcessed[pod.Name] {
+		if (*isProcessed)[pod.Name] {
 			log.Infof("Fault already injected in pod %s", pod.Name)
 			continue
 		}
@@ -82,49 +86,49 @@ func (n NetworkLoss) searchPodsAndInjectAndRemoveFault(ctx context.Context, canc
 		go n.injectAndRemoveFault(ctx, cancelFunc, wg, pod, params)
 
 		wg.Add(1)
-		isProcessed[pod.Name] = true
+		(*isProcessed)[pod.Name] = true
 	}
 }
 
 func (n NetworkLoss) injectAndRemoveFault(ctx context.Context, cancelFunc context.CancelFunc, wg *sync.WaitGroup, pod client.Pod, params NetworkLossParams) {
 	defer wg.Done()
 
-	log.Infof("Injecting network-loss fault in pod %s", pod.Name)
-
+	containerName := pod.Containers[0].ID
 	containerID := pod.Containers[0].ID
 
-	log.Infof("Container id %s", containerID)
+	log.Infof("Injecting and removing network-loss fault in pod %s - container name %s - container ID %s", pod.Name, containerName, containerID)
 
 	container, err := n.ContainerRuntime.GetContainerByID(ctx, containerID)
 	if err != nil {
-		log.Errorf("NetworkLoss.injectAndRemoveFault - error on get container by ID: %s", err)
+		log.Errorf("NetworkLoss.injectAndRemoveFault - error on get container by ID %s", err)
 		cancelFunc()
 		return
 	}
 
-	pid := container.PID
-	log.Infof("Container PID: %d", pid)
+	log.Info("Injecting network-loss")
 
-	err = n.injectFault(pid, params)
+	err = n.injectFault(container.PID, params)
 	if err != nil {
-		log.Errorf("NetworkLoss.injectAndRemoveFault - error on inject fault on PID %d, error: %s", pid, err)
+		log.Errorf("NetworkLoss.injectAndRemoveFault - error on inject fault on PID %d, error: %s", container.PID, err)
 		cancelFunc()
 		return
 	}
 
 	<-ctx.Done()
 
-	log.Infof("Removing network-loss fault in pod %s", pod.Name)
+	log.Info("Removing network-loss")
 
-	err = n.removeFault(pid, params)
+	err = n.removeFault(container.PID, params)
 	if err != nil {
-		log.Errorf("NetworkLoss.injectAndRemoveFault - error on remove fault on PID %d, error: %s", pid, err)
+		log.Errorf("NetworkLoss.injectAndRemoveFault - error on remove fault on PID %d, error: %s", container.PID, err)
 		cancelFunc()
 		return
 	}
 }
 
 func (n NetworkLoss) injectFault(pid int, params NetworkLossParams) error {
+	log.Infof("Injecting network-loss fault in pid %d", pid)
+
 	var injects []string
 	destinationIPsSlice := strings.Split(params.DestinationIPs, ",")
 	log.Infof("Number of IPs: %d", len(destinationIPsSlice))
@@ -157,6 +161,8 @@ func (n NetworkLoss) injectFault(pid int, params NetworkLossParams) error {
 }
 
 func (n NetworkLoss) removeFault(pid int, params NetworkLossParams) error {
+	log.Infof("Removing network-loss fault in pid %d", pid)
+
 	kill := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc delete dev %s root", pid, params.NetworkInterface)
 
 	_, _, err := n.Command.Exec(kill)
