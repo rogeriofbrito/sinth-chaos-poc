@@ -35,19 +35,30 @@ func main() {
 	// ContainerRuntime client
 	var containerRuntime client.ContainerRuntime = client.NewContainerdContainerRuntime(command, socketPath)
 
+	log.Info("Creating network-loss fault engine")
+	networkLossFaulEngine := chaos.FaultEngine{
+		FaultAction:      chaos.NewNetworkLossFaultAction(command),
+		Kubernetes:       kubernetes,
+		ContainerRuntime: containerRuntime,
+	}
+
+	// CommonParams
+	log.Info("Creating common params")
+	cparams := chaos.CommonParams{
+		Timeout:       60,
+		Namespace:     namespace,
+		LabelSelector: labelSelector,
+	}
+
 	// NetworkLossParams
 	log.Info("Creating network-loss params")
-	params := chaos.NetworkLossParams{
-		Namespace:        namespace,
-		LabelSelector:    labelSelector,
+	fparams := chaos.NetworkLossParams{
 		DestinationIPs:   destinationIPs,
 		NetworkInterface: networkInterface,
 		NetemCommands:    netemCommands,
 	}
 
-	// NetworkLoss
-	networkLoss := chaos.NewNetworkLoss(kubernetes, containerRuntime, command)
-	networkLoss.Execute(ctx, params)
+	networkLossFaulEngine.Execute(ctx, cparams, fparams)
 
 	time.Sleep(600 * time.Second)
 }

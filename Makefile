@@ -1,3 +1,5 @@
+all: docker k8s-delete k8s-apply
+
 docker:
 	docker build -t sinth-chaos-poc .
 	docker tag sinth-chaos-poc localhost:5000/sinth-chaos-poc:latest

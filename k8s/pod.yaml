@@ -39,5 +39,7 @@ spec:
           add:
             - NET_ADMIN
             - SYS_ADMIN
+            - SYS_PTRACE
         privileged: true
+        runAsUser: 0
   hostPID: true

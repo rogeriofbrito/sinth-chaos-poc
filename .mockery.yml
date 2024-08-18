@@ -12,3 +12,8 @@ packages:
     interfaces:
       Command:
         config:
+  github.com/rogeriofbrito/sinth-chaos-poc/pkg/chaos:
+      config:
+      interfaces:
+        IFaultAction:
+          config:
